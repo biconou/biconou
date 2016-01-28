@@ -1,0 +1,21 @@
+#!/bin/sh
+    
+case "$1" in
+	start)
+          echo "demarrage de subsonic"
+	  cd /DATA/biconou
+	  su bi -c './subsonic.sh'
+	;;
+
+	stop)
+          echo "arret de subsonic"
+	  cd /DATA/biconou
+	  su bi -c './subsonic_stop.sh'
+	;;
+
+	*)
+		exit 1
+	;;
+esac
+
+exit 0
