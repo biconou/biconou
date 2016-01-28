@@ -51,6 +51,7 @@ usage() {
     echo "  --default-playlist-folder=DIR Configure Subsonic to use this folder for playlists.  This option "
     echo "                                only has effect the first time Subsonic is started. Default '/var/playlists'"
     echo "  --jmx                Activate JMX."
+    echo "  --externaldb         Run external data base."
     exit 1
 }
 
@@ -101,6 +102,11 @@ while [ $# -ge 1 ]; do
             JMX_OPTIONS="${JMX_OPTIONS} -Dcom.sun.management.jmxremote.ssl=false"
             JMX_OPTIONS="${JMX_OPTIONS} -Djava.rmi.server.hostname=192.168.0.11"
             ;;
+        --externaldb)
+			EXTERNAL_DB="-Dcom.github.biconou.serverDB.url=jdbc:hsqldb:hsql://localhost/subsonic"
+			EXTERNAL_DB="${EXTERNAL_DB} -Dcom.github.biconou.serverDB.username=sa"
+			EXTERNAL_DB="${EXTERNAL_DB} -Dcom.github.biconou.serverDB.password="""
+            ;;
         *)
             usage
             ;;
@@ -114,19 +120,33 @@ if [ -e "${JAVA_HOME}" ]
     then
     JAVA=${JAVA_HOME}/bin/java
 fi
+echo "Java command is ${JAVA}"
 
 # Create Subsonic home directory.
+echo "Create SUBSONIC_HOME if does not exists"
 mkdir -p ${SUBSONIC_HOME}
 LOG=${SUBSONIC_HOME}/subsonic_sh.log
 rm -f ${LOG}
+
+if [ -n "${EXTERNAL_DB}" ]
+	then
+	echo "Start external data base"
+	cd ..
+	. ./dbstart.sh
+	cd ./subsonic
+	sleep 20
+fi
 
 cd $(dirname $0)
 if [ -L $0 ] && ([ -e /bin/readlink ] || [ -e /usr/bin/readlink ]); then
     cd $(dirname $(readlink $0))
 fi
 
+
+echo "Launch subsonic"
 ${JAVA} -Xmx${SUBSONIC_MAX_MEMORY}m \
   ${JMX_OPTIONS} \
+  ${EXTERNAL_DB} \
   -Dsubsonic.home=${SUBSONIC_HOME} \
   -Dsubsonic.host=${SUBSONIC_HOST} \
   -Dsubsonic.port=${SUBSONIC_PORT} \
@@ -139,11 +159,9 @@ ${JAVA} -Xmx${SUBSONIC_MAX_MEMORY}m \
   -verbose:gc \
   -jar subsonic-booter-jar-with-dependencies.jar > ${LOG} 2>&1 &
 
-#-Dcom.github.biconou.serverDB.url=jdbc:hsqldb:hsql://localhost/subsonic \
-#-Dcom.github.biconou.serverDB.username=sa \
-#-Dcom.github.biconou.serverDB.password="" \
 
 # Write pid to pidfile if it is defined.
+echo "Write pid in ${SUBSONIC_PIDFILE}"
 if [ $SUBSONIC_PIDFILE ]; then
     echo $! > ${SUBSONIC_PIDFILE}
 fi
